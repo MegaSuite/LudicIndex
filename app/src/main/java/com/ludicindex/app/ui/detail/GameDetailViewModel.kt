@@ -110,10 +110,10 @@ class GameDetailViewModel(
         load()
     }
 
-    fun addToWishlist() {
+    fun addToWishlist(platform: String? = null) {
         val detail = (content.value as? DetailContentState.Content)?.detail ?: return
         viewModelScope.launch {
-            val added = wishlistRepository.addGame(detail.toGame())
+            val added = wishlistRepository.addGame(detail.toGame(), platform = platform)
             message.value = if (added) "已加入心愿单" else "已经在心愿单里了"
         }
     }

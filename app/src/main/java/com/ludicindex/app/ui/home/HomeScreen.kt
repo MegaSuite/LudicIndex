@@ -17,20 +17,30 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ludicindex.app.data.prefs.ImageQuality
+import com.ludicindex.app.domain.match.TitleMatcher
 import com.ludicindex.app.domain.model.Game
+import com.ludicindex.app.domain.model.Platform
 import com.ludicindex.app.ui.LocalAppContainer
 import com.ludicindex.app.ui.appViewModel
 import com.ludicindex.app.ui.components.EmptyView
@@ -38,6 +48,8 @@ import com.ludicindex.app.ui.components.ErrorView
 import com.ludicindex.app.ui.components.GameCard
 import com.ludicindex.app.ui.components.GameListItem
 import com.ludicindex.app.ui.components.LoadingView
+import com.ludicindex.app.ui.library.LibraryCatalogContent
+import com.ludicindex.app.ui.library.LibraryViewModel
 
 @Composable
 fun HomeScreen(
@@ -48,23 +60,112 @@ fun HomeScreen(
     val viewModel: HomeViewModel = appViewModel { container ->
         HomeViewModel(container.gameRepository)
     }
+    val libraryViewModel: LibraryViewModel = appViewModel { container ->
+        LibraryViewModel(container.libraryRepository, container.settingsStore)
+    }
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val libraryState by libraryViewModel.state.collectAsStateWithLifecycle()
 
     val container = LocalAppContainer.current
     val imageQuality by container.settingsStore.imageQuality
         .collectAsStateWithLifecycle(initialValue = ImageQuality.STANDARD)
 
-    HomeContent(
-        state = state,
-        imageQuality = imageQuality,
-        onQueryChange = viewModel::onQueryChange,
-        onClearQuery = viewModel::clearQuery,
-        onRefresh = viewModel::refresh,
-        onRetry = viewModel::retry,
-        onGameClick = onGameClick,
-        onOpenSettings = onOpenSettings,
-        modifier = modifier,
-    )
+    var tabIndex by rememberSaveable { mutableIntStateOf(0) }
+    val tab = HomeTab.entries[tabIndex]
+
+    // The catalogs only give us a title; reuse the existing IGDB search + detail flow for the rest.
+    // "PS4 & PS5" tails are stripped so the IGDB query stays clean.
+    val searchForTitle: (String) -> Unit = { title ->
+        viewModel.onQueryChange(TitleMatcher.searchTitle(title))
+        tabIndex = HomeTab.POPULAR.ordinal
+    }
+
+    // Subscription catalogs are only fetched when a library tab is first opened.
+    LaunchedEffect(tab) {
+        if (tab != HomeTab.POPULAR) libraryViewModel.ensureLoaded()
+    }
+
+    Column(modifier = modifier.fillMaxSize()) {
+        HomeTabRow(
+            selected = tab,
+            onSelect = { tabIndex = it.ordinal },
+        )
+
+        when (tab) {
+            HomeTab.POPULAR -> HomeContent(
+                state = state,
+                imageQuality = imageQuality,
+                onQueryChange = viewModel::onQueryChange,
+                onClearQuery = viewModel::clearQuery,
+                onRefresh = viewModel::refresh,
+                onRetry = viewModel::retry,
+                onGameClick = onGameClick,
+                onOpenSettings = onOpenSettings,
+            )
+
+            HomeTab.XBOX_GAME_PASS -> LibraryCatalogContent(
+                title = "Xbox Game Pass",
+                games = libraryState.xbox,
+                totalCount = libraryState.xboxTotal,
+                devices = libraryState.xboxDevices,
+                filter = libraryState.xboxFilter,
+                isLoading = libraryState.isLoading,
+                isRefreshing = libraryState.isRefreshing,
+                lastSyncedAtMillis = libraryState.lastSyncedAtMillis,
+                onQueryChange = { libraryViewModel.setQuery(Platform.XBOX, it) },
+                onToggleDevice = { libraryViewModel.toggleDevice(Platform.XBOX, it) },
+                onClearDevices = { libraryViewModel.clearDevices(Platform.XBOX) },
+                onClearFilter = { libraryViewModel.clearFilter(Platform.XBOX) },
+                onRefresh = libraryViewModel::refresh,
+                onGameTitleClick = searchForTitle,
+            )
+
+            HomeTab.PS_PLUS -> LibraryCatalogContent(
+                title = "PS Plus",
+                games = libraryState.psPlus,
+                totalCount = libraryState.psPlusTotal,
+                devices = libraryState.psPlusDevices,
+                filter = libraryState.psPlusFilter,
+                isLoading = libraryState.isLoading,
+                isRefreshing = libraryState.isRefreshing,
+                lastSyncedAtMillis = libraryState.lastSyncedAtMillis,
+                onQueryChange = { libraryViewModel.setQuery(Platform.PSN, it) },
+                onToggleDevice = { libraryViewModel.toggleDevice(Platform.PSN, it) },
+                onClearDevices = { libraryViewModel.clearDevices(Platform.PSN) },
+                onClearFilter = { libraryViewModel.clearFilter(Platform.PSN) },
+                onRefresh = libraryViewModel::refresh,
+                onGameTitleClick = searchForTitle,
+            )
+        }
+    }
+
+    libraryState.message?.let { message ->
+        AlertDialog(
+            onDismissRequest = libraryViewModel::dismissMessage,
+            title = { Text("游戏库更新未全部完成") },
+            text = { Text(message) },
+            confirmButton = {
+                TextButton(onClick = libraryViewModel::dismissMessage) { Text("知道了") }
+            },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HomeTabRow(
+    selected: HomeTab,
+    onSelect: (HomeTab) -> Unit,
+) {
+    PrimaryTabRow(selectedTabIndex = selected.ordinal) {
+        HomeTab.entries.forEach { tab ->
+            Tab(
+                selected = tab == selected,
+                onClick = { onSelect(tab) },
+                text = { Text(tab.label) },
+            )
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

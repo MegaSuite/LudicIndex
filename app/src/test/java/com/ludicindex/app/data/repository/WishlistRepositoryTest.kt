@@ -10,7 +10,6 @@ import com.ludicindex.app.data.local.dao.WishlistDao
 import com.ludicindex.app.data.backup.BackupItem
 import com.ludicindex.app.data.backup.WishlistBackup
 import com.ludicindex.app.data.local.entity.TagEntity
-import com.ludicindex.app.domain.model.EntryStatus
 import com.ludicindex.app.domain.model.Game
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -55,12 +54,13 @@ class WishlistRepositoryTest {
         val added = repository.addGame(
             Game(igdbId = 1942, name = "The Witcher 3", releaseDate = 1_431_993_600, rating = 92.75),
             tagNames = listOf("PC", "Backlog", "pc"),
+            platform = "Steam",
         )
 
         assertTrue(added)
         val entry = repository.observeEntries().first().single()
         assertEquals("The Witcher 3", entry.name)
-        assertEquals(EntryStatus.WANT, entry.status)
+        assertEquals("Steam", entry.platform)
         assertEquals(1_000L, entry.addedAt)
         // "pc" collapses into "PC" thanks to case-insensitive tag names.
         assertEquals(listOf("Backlog", "PC"), entry.tags.map { it.name }.sorted())
@@ -120,8 +120,8 @@ class WishlistRepositoryTest {
         repository.addGame(
             Game(igdbId = 1942, name = "The Witcher 3", rating = 92.75),
             tagNames = listOf("PC", "Backlog"),
+            platform = "GOG",
         )
-        repository.setStatus(1942, EntryStatus.PLAYING)
         repository.setNote(1942, "act 2")
 
         val backup = repository.exportBackup()
@@ -133,7 +133,7 @@ class WishlistRepositoryTest {
         assertEquals(1, stats.added)
         assertEquals(0, stats.skipped)
         val entry = repository.observeEntries().first().single()
-        assertEquals(EntryStatus.PLAYING, entry.status)
+        assertEquals("GOG", entry.platform)
         assertEquals("act 2", entry.note)
         assertEquals(listOf("Backlog", "PC"), entry.tags.map { it.name }.sorted())
     }
@@ -147,7 +147,6 @@ class WishlistRepositoryTest {
                 BackupItem(
                     igdbId = 7,
                     name = "Celeste",
-                    status = "PLAYED",
                     note = "100%",
                     addedAt = 1,
                     tags = listOf("Switch"),
@@ -160,7 +159,6 @@ class WishlistRepositoryTest {
         assertEquals(0, stats.added)
         assertEquals(1, stats.updated)
         val entry = repository.observeEntries().first().single()
-        assertEquals(EntryStatus.PLAYED, entry.status)
         assertEquals("100%", entry.note)
         assertEquals(listOf("Switch"), entry.tags.map { it.name })
     }
@@ -196,31 +194,40 @@ class WishlistRepositoryTest {
     }
 
     @Test
-    fun observeTagsExposesPresetsAfterSeeding() = runTest {
+    fun ensurePresetTagsClearsPlatformTagsShippedByOlderBuilds() = runTest {
+        // Platform used to be a tag; it is a per-entry field now, so seeding drops the old presets.
+        tagDao.insert(TagEntity(name = "PS5", isPreset = true, colorArgb = 1))
+        tagDao.insert(TagEntity(name = "PC", isPreset = true, colorArgb = 2))
+
         repository.ensurePresetTags()
 
-        val tags = repository.observeTags().first()
+        assertTrue(repository.observeTags().first().isEmpty())
+    }
 
-        assertEquals(PresetTags.ALL.size, tags.size)
-        assertTrue(tags.all { it.isPreset })
-        assertTrue(tags.any { it.name == "PS5" })
+    @Test
+    fun setPlatformReplacesTheStoredValue() = runTest {
+        repository.addGame(Game(igdbId = 7, name = "Celeste"), platform = "Steam")
+        clock = 2_000
+
+        repository.setPlatform(7, "Nintendo eShop")
+        assertEquals("Nintendo eShop", repository.observeEntries().first().single().platform)
+
+        repository.setPlatform(7, null)
+        assertNull(repository.observeEntries().first().single().platform)
     }
 
     @Test
     fun createTagRejectsBlanksAndDuplicates() = runTest {
-        repository.ensurePresetTags()
-
         assertFalse(repository.createTag("   "))
-        assertFalse(repository.createTag("PS5"))
         assertTrue(repository.createTag("限时免费"))
+        assertFalse(repository.createTag("限时免费"))
         assertTrue(repository.observeTags().first().any { it.name == "限时免费" })
     }
 
     @Test
     fun createTagIgnoresCaseWhenCheckingDuplicates() = runTest {
-        repository.ensurePresetTags()
-
-        assertFalse(repository.createTag("ps5"))
+        assertTrue(repository.createTag("Backlog"))
+        assertFalse(repository.createTag("backlog"))
     }
 
     @Test

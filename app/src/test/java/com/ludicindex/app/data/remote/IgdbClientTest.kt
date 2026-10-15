@@ -1,6 +1,7 @@
 package com.ludicindex.app.data.remote
 
 import com.ludicindex.app.data.prefs.IgdbCredentials
+import com.ludicindex.app.domain.model.CompanyRole
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
@@ -31,6 +32,25 @@ class IgdbClientTest {
         assertEquals("test-client", call.clientId)
         assertEquals("Bearer token-1", call.bearer)
         assertEquals("fields id; limit 1;", call.body)
+    }
+
+    @Test
+    fun companyGamesFiltersByRoleAndExcludesEditions() = runTest {
+        api.enqueueJson("[]")
+        client().companyGames(companyId = 908, role = CompanyRole.DEVELOPER, limit = 30, offset = 60)
+        val developerBody = api.calls.last().body
+        assertTrue(developerBody.contains("involved_companies.company = 908"))
+        assertTrue(developerBody.contains("involved_companies.developer = true"))
+        assertTrue(developerBody.contains("version_parent = null"))
+        assertTrue(developerBody.contains("sort first_release_date desc"))
+        assertTrue(developerBody.contains("limit 30"))
+        assertTrue(developerBody.contains("offset 60"))
+
+        api.enqueueJson("[]")
+        client().companyGames(companyId = 1, role = CompanyRole.PUBLISHER, limit = 30, offset = 0)
+        val publisherBody = api.calls.last().body
+        assertTrue(publisherBody.contains("involved_companies.publisher = true"))
+        assertTrue(!publisherBody.contains("involved_companies.developer"))
     }
 
     @Test

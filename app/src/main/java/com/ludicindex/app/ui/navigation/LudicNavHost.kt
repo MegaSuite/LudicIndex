@@ -8,6 +8,8 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.ludicindex.app.domain.model.CompanyRole
+import com.ludicindex.app.ui.company.CompanyScreen
 import com.ludicindex.app.ui.detail.GameDetailScreen
 import com.ludicindex.app.ui.home.HomeScreen
 import com.ludicindex.app.ui.settings.SettingsScreen
@@ -58,6 +60,29 @@ fun LudicNavHost(
                 igdbId = entry.arguments?.getLong(Routes.ARG_IGDB_ID) ?: 0L,
                 onBack = { navController.popBackStack() },
                 onOpenSettings = { navController.switchTab(Routes.SETTINGS) },
+                onGameClick = { igdbId -> navController.navigate(Routes.gameDetail(igdbId)) },
+                onCompanyClick = { company, role ->
+                    navController.navigate(Routes.company(company.id, role, company.name))
+                },
+            )
+        }
+
+        composable(
+            route = Routes.COMPANY,
+            arguments = listOf(
+                navArgument(Routes.ARG_COMPANY_ID) { type = NavType.LongType },
+                navArgument(Routes.ARG_COMPANY_ROLE) { type = NavType.StringType },
+                navArgument(Routes.ARG_COMPANY_NAME) {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+            ),
+        ) { entry ->
+            CompanyScreen(
+                companyId = entry.arguments?.getLong(Routes.ARG_COMPANY_ID) ?: 0L,
+                companyName = entry.arguments?.getString(Routes.ARG_COMPANY_NAME).orEmpty(),
+                role = CompanyRole.fromKey(entry.arguments?.getString(Routes.ARG_COMPANY_ROLE).orEmpty()),
+                onBack = { navController.popBackStack() },
                 onGameClick = { igdbId -> navController.navigate(Routes.gameDetail(igdbId)) },
             )
         }

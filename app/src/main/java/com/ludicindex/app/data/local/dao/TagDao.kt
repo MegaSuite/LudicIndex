@@ -38,4 +38,8 @@ interface TagDao {
         """,
     )
     suspend fun deleteUnusedPresets(activePresetNames: List<String>)
+
+    /** Used when the app ships no presets at all: drops every preset the user is not using. */
+    @Query("DELETE FROM tags WHERE is_preset = 1 AND id NOT IN (SELECT tag_id FROM entry_tags)")
+    suspend fun deleteAllUnusedPresets()
 }

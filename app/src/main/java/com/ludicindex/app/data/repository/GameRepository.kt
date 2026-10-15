@@ -3,6 +3,7 @@ package com.ludicindex.app.data.repository
 import com.ludicindex.app.data.remote.IgdbClient
 import com.ludicindex.app.data.remote.dto.GameDto
 import com.ludicindex.app.data.remote.dto.InvolvedCompanyDto
+import com.ludicindex.app.domain.model.CompanyRole
 import com.ludicindex.app.domain.model.Game
 
 class GameRepository(private val client: IgdbClient) {
@@ -34,12 +35,20 @@ class GameRepository(private val client: IgdbClient) {
 
     suspend fun getGame(igdbId: Long): Game? = client.gameDetail(igdbId)?.toDomain()
 
+    /** Other games by a developer / publisher, newest first. */
+    suspend fun companyGames(
+        companyId: Long,
+        role: CompanyRole,
+        offset: Int = 0,
+    ): List<Game> = client.companyGames(companyId, role, COMPANY_PAGE_SIZE, offset).map { it.toDomain() }
+
     /** Throws an [com.ludicindex.app.data.remote.IgdbException] with a user-facing message. */
     suspend fun testConnection() = client.ping()
 
     private companion object {
         const val DEFAULT_LIMIT = 24
         const val MIN_SEARCH_LENGTH = 2
+        const val COMPANY_PAGE_SIZE = 30
     }
 }
 

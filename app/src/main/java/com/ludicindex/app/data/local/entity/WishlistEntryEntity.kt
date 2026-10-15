@@ -4,7 +4,6 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
-import com.ludicindex.app.domain.model.EntryStatus
 
 @Entity(
     tableName = "wishlist_entries",
@@ -26,8 +25,8 @@ data class WishlistEntryEntity(
     val rating: Double? = null,
     @ColumnInfo(name = "summary")
     val summary: String? = null,
-    @ColumnInfo(name = "status")
-    val status: EntryStatus = EntryStatus.WANT,
+    @ColumnInfo(name = "platform")
+    val platform: String? = null,
     @ColumnInfo(name = "note")
     val note: String = "",
     @ColumnInfo(name = "added_at")

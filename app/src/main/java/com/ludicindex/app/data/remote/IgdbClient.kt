@@ -3,6 +3,7 @@ package com.ludicindex.app.data.remote
 import com.ludicindex.app.data.remote.dto.GameDto
 import com.ludicindex.app.data.remote.dto.IgdbErrorDto
 import com.ludicindex.app.data.remote.dto.PopularityPrimitiveDto
+import com.ludicindex.app.domain.model.CompanyRole
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
@@ -88,6 +89,37 @@ class IgdbClient(
                 .build(),
         ),
     )
+
+    /**
+     * Games where [companyId] was the developer or the publisher, newest first. Editions and
+     * non-games are excluded the same way search excludes them.
+     */
+    suspend fun companyGames(
+        companyId: Long,
+        role: CompanyRole,
+        limit: Int = COMPANY_PAGE_SIZE,
+        offset: Int = 0,
+    ): List<GameDto> {
+        val roleFilter = when (role) {
+            CompanyRole.DEVELOPER -> "involved_companies.developer = true"
+            CompanyRole.PUBLISHER -> "involved_companies.publisher = true"
+        }
+        return decode(
+            post(
+                endpoint = "games",
+                apicalypse = Apicalypse.builder()
+                    .fields(*LIST_FIELDS.split(",").toTypedArray())
+                    .where(
+                        "involved_companies.company = $companyId & $roleFilter" +
+                            " & version_parent = null & game_type != ($EXCLUDED_GAME_TYPES)",
+                    )
+                    .sort("first_release_date", descending = true)
+                    .limit(limit)
+                    .offset(offset)
+                    .build(),
+            ),
+        )
+    }
 
     /** Fallback popularity source when the PopScore primitives come back empty. */
     suspend fun hypedGames(limit: Int): List<GameDto> = decode(
@@ -187,6 +219,9 @@ class IgdbClient(
         private const val EXCLUDED_GAME_TYPES = "1,3,5,7,13,14"
 
         private const val RELATED_LIMIT = 100
+
+        /** Page size for the "other games by this company" list. */
+        const val COMPANY_PAGE_SIZE = 30
 
         private const val RELATED_FIELDS =
             "id,name,game_type,cover.image_id,first_release_date,parent_game,version_parent"

@@ -10,7 +10,6 @@ import com.ludicindex.app.data.local.entity.EntryTagCrossRef
 import com.ludicindex.app.data.local.entity.TagEntity
 import com.ludicindex.app.data.local.entity.WishlistEntryEntity
 import com.ludicindex.app.data.local.relation.WishlistEntryWithTags
-import com.ludicindex.app.domain.model.EntryStatus
 import com.ludicindex.app.domain.model.Game
 import com.ludicindex.app.domain.model.Tag
 import com.ludicindex.app.domain.model.WishlistEntry
@@ -50,7 +49,10 @@ class WishlistRepository(
         }
         // Drop presets that were shipped by an older build, but only the unused ones.
         val names = PresetTags.ALL.map { it.name }
-        if (names.isNotEmpty()) {
+        if (names.isEmpty()) {
+            // No presets ship any more (platform is a per-entry field now); clear every unused one.
+            tagDao.deleteAllUnusedPresets()
+        } else {
             tagDao.deleteUnusedPresets(names)
         }
     }
@@ -61,7 +63,11 @@ class WishlistRepository(
     fun observeIsInWishlist(igdbId: Long): Flow<Boolean> = wishlistDao.observeExists(igdbId)
 
     /** @return false when the game is already on the wishlist. */
-    suspend fun addGame(game: Game, tagNames: List<String> = emptyList()): Boolean {
+    suspend fun addGame(
+        game: Game,
+        tagNames: List<String> = emptyList(),
+        platform: String? = null,
+    ): Boolean {
         if (wishlistDao.exists(game.igdbId)) return false
         val timestamp = now()
         val entryId = wishlistDao.insert(
@@ -72,7 +78,7 @@ class WishlistRepository(
                 releaseDate = game.releaseDate,
                 rating = game.rating,
                 summary = game.summary,
-                status = EntryStatus.WANT,
+                platform = platform,
                 note = "",
                 addedAt = timestamp,
                 updatedAt = timestamp,
@@ -82,10 +88,14 @@ class WishlistRepository(
         return true
     }
 
-    suspend fun removeByIgdbId(igdbId: Long) = wishlistDao.deleteByIgdbId(igdbId)
+    /**
+     * Entries created before the platform field existed simply stay empty; the user can pick a
+     * store from the tag editor. Returns nothing to backfill.
+     */
+    suspend fun setPlatform(igdbId: Long, platform: String?) =
+        wishlistDao.updatePlatform(igdbId, platform, now())
 
-    suspend fun setStatus(igdbId: Long, status: EntryStatus) =
-        wishlistDao.updateStatus(igdbId, status, now())
+    suspend fun removeByIgdbId(igdbId: Long) = wishlistDao.deleteByIgdbId(igdbId)
 
     suspend fun setNote(igdbId: Long, note: String) = wishlistDao.updateNote(igdbId, note, now())
 
@@ -109,7 +119,7 @@ class WishlistRepository(
                     releaseDate = row.entry.releaseDate,
                     rating = row.entry.rating,
                     summary = row.entry.summary,
-                    status = row.entry.status.name,
+                    platform = row.entry.platform,
                     note = row.entry.note,
                     addedAt = row.entry.addedAt,
                     tags = row.tags.map { it.name }.sorted(),
@@ -119,7 +129,7 @@ class WishlistRepository(
     }
 
     /**
-     * @param merge true: existing entries keep their place but take the backup's status/note/tags.
+     * @param merge true: existing entries keep their place but take the backup's note/tags.
      *              false: existing entries are skipped.
      */
     suspend fun importBackup(backup: WishlistBackup, merge: Boolean = true): ImportStats {
@@ -130,7 +140,6 @@ class WishlistRepository(
 
         backup.items.forEach { item ->
             val existing = wishlistDao.getByIgdbId(item.igdbId)
-            val status = parseStatus(item.status)
 
             if (existing == null) {
                 val timestamp = now()
@@ -142,7 +151,7 @@ class WishlistRepository(
                         releaseDate = item.releaseDate,
                         rating = item.rating,
                         summary = item.summary,
-                        status = status,
+                        platform = item.platform,
                         note = item.note,
                         addedAt = item.addedAt,
                         updatedAt = timestamp,
@@ -153,7 +162,7 @@ class WishlistRepository(
             } else if (merge) {
                 wishlistDao.update(
                     existing.entry.copy(
-                        status = status,
+                        platform = item.platform,
                         note = item.note,
                         updatedAt = now(),
                     ),
@@ -200,9 +209,6 @@ class WishlistRepository(
         return (tagDao.getByName(name)?.id ?: -1L) to false
     }
 
-    private fun parseStatus(raw: String): EntryStatus =
-        EntryStatus.entries.firstOrNull { it.name.equals(raw, ignoreCase = true) } ?: EntryStatus.WANT
-
     private companion object {
         const val DEFAULT_TAG_COLOR = 0xFF6C6C6C.toInt()
     }
@@ -223,7 +229,7 @@ internal fun WishlistEntryWithTags.toDomain(): WishlistEntry = WishlistEntry(
     releaseDate = entry.releaseDate,
     rating = entry.rating,
     summary = entry.summary,
-    status = entry.status,
+    platform = entry.platform,
     note = entry.note,
     addedAt = entry.addedAt,
     updatedAt = entry.updatedAt,

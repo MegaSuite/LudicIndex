@@ -9,7 +9,6 @@ import com.ludicindex.app.data.local.dao.WishlistDao
 import com.ludicindex.app.data.local.entity.EntryTagCrossRef
 import com.ludicindex.app.data.local.entity.TagEntity
 import com.ludicindex.app.data.local.entity.WishlistEntryEntity
-import com.ludicindex.app.domain.model.EntryStatus
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
@@ -55,7 +54,6 @@ class WishlistDaoTest {
 
         assertNotNull(loaded)
         assertEquals("The Witcher 3", loaded!!.entry.name)
-        assertEquals(EntryStatus.WANT, loaded.entry.status)
         assertEquals(listOf("PC"), loaded.tags.map { it.name })
     }
 
@@ -106,14 +104,12 @@ class WishlistDaoTest {
     }
 
     @Test
-    fun statusAndNoteUpdatesPersist() = runTest {
+    fun noteUpdatesPersist() = runTest {
         wishlistDao.insert(entry(igdbId = 1, name = "A"))
 
-        wishlistDao.updateStatus(1, EntryStatus.PLAYED, updatedAt = 500)
         wishlistDao.updateNote(1, "finished it", updatedAt = 600)
 
         val loaded = wishlistDao.getByIgdbId(1)!!.entry
-        assertEquals(EntryStatus.PLAYED, loaded.status)
         assertEquals("finished it", loaded.note)
         assertEquals(600L, loaded.updatedAt)
     }

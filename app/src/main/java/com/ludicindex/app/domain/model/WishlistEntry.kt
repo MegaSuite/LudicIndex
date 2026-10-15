@@ -8,7 +8,8 @@ data class WishlistEntry(
     val releaseDate: Long?,
     val rating: Double?,
     val summary: String?,
-    val status: EntryStatus = EntryStatus.WANT,
+    /** Store/platform this entry is tracked for, e.g. "Steam". Null when unspecified. */
+    val platform: String? = null,
     val note: String = "",
     val addedAt: Long,
     val updatedAt: Long,

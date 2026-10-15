@@ -15,7 +15,8 @@ data class WishlistBackup(
     val items: List<BackupItem> = emptyList(),
 ) {
     companion object {
-        const val SCHEMA_VERSION = 1
+        /** 2 dropped the per-item `status`, but v1 files still import fine (unknown keys ignored). */
+        const val SCHEMA_VERSION = 2
         const val APP_ID = "LudicIndex"
     }
 }
@@ -34,8 +35,8 @@ data class BackupItem(
     val rating: Double? = null,
     @SerialName("summary")
     val summary: String? = null,
-    @SerialName("status")
-    val status: String = "WANT",
+    @SerialName("platform")
+    val platform: String? = null,
     @SerialName("note")
     val note: String = "",
     @SerialName("added_at")

@@ -6,7 +6,6 @@ import com.ludicindex.app.data.repository.WishlistRepository
 import com.ludicindex.app.domain.WishlistFilter
 import com.ludicindex.app.domain.WishlistSort
 import com.ludicindex.app.domain.filterAndSort
-import com.ludicindex.app.domain.model.EntryStatus
 import com.ludicindex.app.domain.model.Tag
 import com.ludicindex.app.domain.model.WishlistEntry
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,6 +23,8 @@ data class WishlistUiState(
     val selectedTagIds: Set<Long> = emptySet(),
     val sort: WishlistSort = WishlistSort.ADDED_DESC,
     val editing: WishlistEntry? = null,
+    /** Store links of the entry being edited, for the platform picker. */
+    val platformOptions: List<String> = emptyList(),
     val isLoading: Boolean = true,
 ) {
     val hasAnyEntry: Boolean get() = totalCount > 0
@@ -40,15 +41,19 @@ private data class FilterState(
 
 class WishlistViewModel(
     private val repository: WishlistRepository,
+    /** Resolves a game's store links (Steam, PlayStation Store, …) for the platform picker. */
+    private val storeOptionsProvider: suspend (Long) -> List<String> = { emptyList() },
 ) : ViewModel() {
 
     private val filterState = MutableStateFlow(FilterState())
+    private val platformOptions = MutableStateFlow<List<String>>(emptyList())
 
     val state: StateFlow<WishlistUiState> = combine(
         repository.observeEntries(),
         repository.observeTags(),
         filterState,
-    ) { entries, tags, filter ->
+        platformOptions,
+    ) { entries, tags, filter, options ->
         WishlistUiState(
             visibleEntries = entries.filterAndSort(
                 WishlistFilter(
@@ -64,6 +69,7 @@ class WishlistViewModel(
             selectedTagIds = filter.tagIds,
             sort = filter.sort,
             editing = entries.firstOrNull { it.igdbId == filter.editingIgdbId },
+            platformOptions = options,
             isLoading = false,
         )
     }.stateIn(
@@ -93,10 +99,20 @@ class WishlistViewModel(
 
     fun openEditor(igdbId: Long) {
         filterState.value = filterState.value.copy(editingIgdbId = igdbId)
+        platformOptions.value = emptyList()
+        viewModelScope.launch {
+            platformOptions.value = runCatching { storeOptionsProvider(igdbId) }
+                .getOrDefault(emptyList())
+        }
     }
 
     fun closeEditor() {
         filterState.value = filterState.value.copy(editingIgdbId = null)
+        platformOptions.value = emptyList()
+    }
+
+    fun setPlatform(igdbId: Long, platform: String?) {
+        viewModelScope.launch { repository.setPlatform(igdbId, platform) }
     }
 
     fun remove(igdbId: Long) {
@@ -104,10 +120,6 @@ class WishlistViewModel(
             repository.removeByIgdbId(igdbId)
             if (filterState.value.editingIgdbId == igdbId) closeEditor()
         }
-    }
-
-    fun setStatus(igdbId: Long, status: EntryStatus) {
-        viewModelScope.launch { repository.setStatus(igdbId, status) }
     }
 
     fun setTags(igdbId: Long, tagNames: List<String>) {

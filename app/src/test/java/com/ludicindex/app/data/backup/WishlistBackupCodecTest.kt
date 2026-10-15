@@ -20,7 +20,7 @@ class WishlistBackupCodecTest {
                     releaseDate = 1_431_993_600,
                     rating = 92.75,
                     summary = "An open-world action RPG.",
-                    status = "PLAYING",
+                    platform = "Steam",
                     note = "wait for the next-gen patch",
                     addedAt = 1_759_000_000,
                     tags = listOf("Backlog", "PC"),
@@ -59,10 +59,9 @@ class WishlistBackupCodecTest {
 
         val backup = WishlistBackupCodec.decode(json)
 
-        assertEquals(1, backup.schemaVersion)
+        assertEquals(WishlistBackup.SCHEMA_VERSION, backup.schemaVersion)
         val item = backup.items.single()
         assertEquals(7L, item.igdbId)
-        assertEquals("WANT", item.status)
         assertEquals("", item.note)
         assertEquals(emptyList<String>(), item.tags)
     }

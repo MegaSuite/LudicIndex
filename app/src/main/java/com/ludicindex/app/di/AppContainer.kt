@@ -10,8 +10,13 @@ import com.ludicindex.app.data.remote.IgdbClient
 import com.ludicindex.app.data.remote.RateLimiter
 import com.ludicindex.app.data.remote.TwitchAuthApi
 import com.ludicindex.app.data.remote.TwitchTokenProvider
+import com.ludicindex.app.data.remote.catalog.GamePassApi
+import com.ludicindex.app.data.remote.catalog.GamePassClient
+import com.ludicindex.app.data.remote.catalog.PsPlusApi
+import com.ludicindex.app.data.remote.catalog.PsPlusClient
 import com.ludicindex.app.data.repository.GameDetailRepository
 import com.ludicindex.app.data.repository.GameRepository
+import com.ludicindex.app.data.repository.LibraryRepository
 import com.ludicindex.app.data.repository.WishlistRepository
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
@@ -37,6 +42,15 @@ class AppContainer(context: Context) {
     }
 
     val gameCacheDao: GameCacheDao by lazy { database.gameCacheDao() }
+
+    val libraryRepository: LibraryRepository by lazy {
+        LibraryRepository(
+            libraryDao = database.libraryDao(),
+            wishlistDao = database.wishlistDao(),
+            gamePass = gamePassClient,
+            psPlus = psPlusClient,
+        )
+    }
 
     val settingsStore: SettingsStore by lazy { SettingsStore(appContext.settingsDataStore) }
 
@@ -81,6 +95,28 @@ class AppContainer(context: Context) {
             .build()
             .create(TwitchAuthApi::class.java)
     }
+
+    private val gamePassApi: GamePassApi by lazy {
+        Retrofit.Builder()
+            .baseUrl(GamePassClient.DEFAULT_BASE_URL + "/")
+            .client(okHttpClient)
+            .apply { retrofitFactories.forEach(::addConverterFactory) }
+            .build()
+            .create(GamePassApi::class.java)
+    }
+
+    private val psPlusApi: PsPlusApi by lazy {
+        Retrofit.Builder()
+            .baseUrl(PsPlusClient.DEFAULT_BASE_URL + "/")
+            .client(okHttpClient)
+            .apply { retrofitFactories.forEach(::addConverterFactory) }
+            .build()
+            .create(PsPlusApi::class.java)
+    }
+
+    private val gamePassClient: GamePassClient by lazy { GamePassClient(gamePassApi, json) }
+
+    private val psPlusClient: PsPlusClient by lazy { PsPlusClient(psPlusApi, json) }
 
     private val rateLimiter: RateLimiter by lazy { RateLimiter() }
 

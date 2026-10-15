@@ -28,6 +28,16 @@ class SettingsStore(private val dataStore: DataStore<Preferences>) {
         ImageQuality.fromKey(it[Keys.IMAGE_QUALITY])
     }
 
+    /** Xbox Game Pass store region (e.g. `US`). */
+    val gamePassMarket: Flow<String> = dataStore.data.map {
+        it[Keys.GAME_PASS_MARKET] ?: LibraryRegions.DEFAULT_GAME_PASS_MARKET
+    }
+
+    /** PlayStation Store locale for the PS Plus catalogs (e.g. `en-us`). */
+    val psPlusLocale: Flow<String> = dataStore.data.map {
+        it[Keys.PS_PLUS_LOCALE] ?: LibraryRegions.DEFAULT_PS_PLUS_LOCALE
+    }
+
     val credentials: Flow<IgdbCredentials?> = dataStore.data.map { prefs ->
         val clientId = prefs[Keys.CLIENT_ID]
         val clientSecret = prefs[Keys.CLIENT_SECRET]
@@ -90,12 +100,22 @@ class SettingsStore(private val dataStore: DataStore<Preferences>) {
         dataStore.edit { it[Keys.IMAGE_QUALITY] = quality.name }
     }
 
+    suspend fun setGamePassMarket(market: String) {
+        dataStore.edit { it[Keys.GAME_PASS_MARKET] = market }
+    }
+
+    suspend fun setPsPlusLocale(locale: String) {
+        dataStore.edit { it[Keys.PS_PLUS_LOCALE] = locale }
+    }
+
     private object Keys {
         val CLIENT_ID = stringPreferencesKey("igdb_client_id")
         val CLIENT_SECRET = stringPreferencesKey("igdb_client_secret")
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
         val IMAGE_QUALITY = stringPreferencesKey("image_quality")
+        val GAME_PASS_MARKET = stringPreferencesKey("game_pass_market")
+        val PS_PLUS_LOCALE = stringPreferencesKey("ps_plus_locale")
         val AUTH_TOKEN = stringPreferencesKey("igdb_access_token")
         val AUTH_TOKEN_EXPIRES_AT = longPreferencesKey("igdb_access_token_expires_at")
     }

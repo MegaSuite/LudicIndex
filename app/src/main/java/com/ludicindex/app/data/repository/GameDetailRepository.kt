@@ -3,7 +3,9 @@ package com.ludicindex.app.data.repository
 import com.ludicindex.app.data.local.dao.GameCacheDao
 import com.ludicindex.app.data.local.entity.GameCacheEntity
 import com.ludicindex.app.data.remote.IgdbClient
+import com.ludicindex.app.data.remote.dto.CompanyDto
 import com.ludicindex.app.data.remote.dto.GameDto
+import com.ludicindex.app.domain.model.CompanyRef
 import com.ludicindex.app.domain.model.GameDetail
 import com.ludicindex.app.domain.model.GameVideo
 import com.ludicindex.app.domain.model.RelatedGame
@@ -131,6 +133,8 @@ private fun GameDto.toRelatedGame(): RelatedGame = RelatedGame(
     releaseDate = firstReleaseDate,
 )
 
+private fun CompanyDto.toRef(): CompanyRef = CompanyRef(id = id, name = name)
+
 internal fun GameDto.toDetail(related: List<GameDto> = emptyList()): GameDetail = GameDetail(
     igdbId = id,
     name = name,
@@ -158,9 +162,9 @@ internal fun GameDto.toDetail(related: List<GameDto> = emptyList()): GameDetail 
     gameModes = gameModes.map { it.name },
     playerPerspectives = playerPerspectives.map { it.name },
     engines = gameEngines.map { it.name },
-    developers = involvedCompanies.filter { it.developer }.mapNotNull { it.company?.name }.distinct(),
-    publishers = involvedCompanies.filter { it.publisher }.mapNotNull { it.company?.name }.distinct(),
-    portingCompanies = involvedCompanies.filter { it.porting }.mapNotNull { it.company?.name }.distinct(),
+    developers = involvedCompanies.filter { it.developer }.mapNotNull { it.company?.toRef() }.distinct(),
+    publishers = involvedCompanies.filter { it.publisher }.mapNotNull { it.company?.toRef() }.distinct(),
+    portingCompanies = involvedCompanies.filter { it.porting }.mapNotNull { it.company?.toRef() }.distinct(),
     collection = collection?.name,
     franchise = franchise?.name,
     similarGames = similarGames.map {

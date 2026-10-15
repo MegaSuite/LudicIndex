@@ -71,7 +71,14 @@ fun WishlistScreen(
     modifier: Modifier = Modifier,
 ) {
     val viewModel: WishlistViewModel = appViewModel { container ->
-        WishlistViewModel(container.wishlistRepository)
+        WishlistViewModel(
+            repository = container.wishlistRepository,
+            storeOptionsProvider = { igdbId ->
+                val detail = container.gameDetailRepository.cached(igdbId)
+                    ?: runCatching { container.gameDetailRepository.fetch(igdbId) }.getOrNull()
+                detail?.storeOptions().orEmpty()
+            },
+        )
     }
     val state by viewModel.state.collectAsStateWithLifecycle()
     val imageQuality by LocalAppContainer.current.settingsStore.imageQuality
@@ -122,8 +129,9 @@ fun WishlistScreen(
         TagEditorSheet(
             entry = entry,
             allTags = state.allTags,
+            platformOptions = state.platformOptions,
             onDismiss = viewModel::closeEditor,
-            onStatusChange = { viewModel.setStatus(entry.igdbId, it) },
+            onPlatformChange = { viewModel.setPlatform(entry.igdbId, it) },
             onTagsChange = { viewModel.setTags(entry.igdbId, it) },
             onCreateTag = viewModel::createTag,
             onDeleteTag = viewModel::deleteTag,
@@ -312,7 +320,7 @@ private fun WishlistRow(
             Text(
                 text = listOfNotNull(
                     formatReleaseYear(entry.releaseDate),
-                    entry.status.displayLabel,
+                    entry.platform,
                 ).joinToString(" · "),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

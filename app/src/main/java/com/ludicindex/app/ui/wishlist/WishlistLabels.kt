@@ -1,14 +1,6 @@
 package com.ludicindex.app.ui.wishlist
 
 import com.ludicindex.app.domain.WishlistSort
-import com.ludicindex.app.domain.model.EntryStatus
-
-val EntryStatus.displayLabel: String
-    get() = when (this) {
-        EntryStatus.WANT -> "想玩"
-        EntryStatus.PLAYING -> "在玩"
-        EntryStatus.PLAYED -> "已玩"
-    }
 
 val WishlistSort.displayLabel: String
     get() = when (this) {

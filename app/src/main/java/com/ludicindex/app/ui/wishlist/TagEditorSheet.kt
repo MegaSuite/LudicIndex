@@ -40,13 +40,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.ludicindex.app.domain.model.EntryStatus
 import com.ludicindex.app.domain.model.Tag
 import com.ludicindex.app.domain.model.WishlistEntry
 import com.ludicindex.app.ui.components.SectionTitle
 
 /**
- * Edits one wishlist entry: status, tags, and custom tags with a color.
+ * Edits one wishlist entry: its tags and custom tags with a color.
  *
  * Tag selections are staged locally and written once when the user saves. The content scrolls so
  * the action row cannot be pushed off screen when the tag list or the palette grows.
@@ -56,8 +55,9 @@ import com.ludicindex.app.ui.components.SectionTitle
 fun TagEditorSheet(
     entry: WishlistEntry,
     allTags: List<Tag>,
+    platformOptions: List<String>,
     onDismiss: () -> Unit,
-    onStatusChange: (EntryStatus) -> Unit,
+    onPlatformChange: (String?) -> Unit,
     onTagsChange: (List<String>) -> Unit,
     onCreateTag: (String, Int) -> Unit,
     onDeleteTag: (Long) -> Unit,
@@ -87,15 +87,30 @@ fun TagEditorSheet(
                 maxLines = 2,
             )
 
-            SectionTitle("状态")
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                EntryStatus.entries.forEach { status ->
+            SectionTitle("游戏平台")
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                FilterChip(
+                    selected = entry.platform == null,
+                    onClick = { onPlatformChange(null) },
+                    label = { Text("不指定") },
+                )
+                platformOptions.forEach { option ->
                     FilterChip(
-                        selected = entry.status == status,
-                        onClick = { onStatusChange(status) },
-                        label = { Text(status.displayLabel) },
+                        selected = entry.platform == option,
+                        onClick = { onPlatformChange(option) },
+                        label = { Text(option) },
                     )
                 }
+            }
+            if (platformOptions.isEmpty()) {
+                Text(
+                    text = "暂无商店选项：打开一次该游戏的详情后即可选择。",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
 
             // "编辑" sits opposite the "标签" heading; it swaps every chip for a deletable one.

@@ -5,7 +5,6 @@ import com.ludicindex.app.createTestDatabase
 import com.ludicindex.app.data.local.AppDatabase
 import com.ludicindex.app.data.repository.WishlistRepository
 import com.ludicindex.app.domain.WishlistSort
-import com.ludicindex.app.domain.model.EntryStatus
 import com.ludicindex.app.domain.model.Game
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -149,22 +148,6 @@ class WishlistViewModelTest {
 
         assertEquals(2, viewModel.state.value.totalCount)
         assertNull(viewModel.state.value.visibleEntries.firstOrNull { it.igdbId == 1L })
-    }
-
-    @Test
-    fun changesStatus() = runTest(mainDispatcherRule.testDispatcher) {
-        seed()
-        val viewModel = WishlistViewModel(repository)
-        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.state.collect {} }
-        advanceUntilIdle()
-
-        viewModel.setStatus(1, EntryStatus.PLAYING)
-        advanceUntilIdle()
-
-        assertEquals(
-            EntryStatus.PLAYING,
-            viewModel.state.value.visibleEntries.first { it.igdbId == 1L }.status,
-        )
     }
 
     @Test

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ludicindex.app.data.backup.WishlistBackupCodec
 import com.ludicindex.app.data.prefs.ImageQuality
+import com.ludicindex.app.data.prefs.LibraryRegions
 import com.ludicindex.app.data.prefs.SettingsStore
 import com.ludicindex.app.data.prefs.ThemeMode
 import com.ludicindex.app.data.remote.IgdbException
@@ -52,6 +53,20 @@ class SettingsViewModel(
 
     val imageQuality: StateFlow<ImageQuality> = settingsStore.imageQuality
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT), ImageQuality.STANDARD)
+
+    val gamePassMarket: StateFlow<String> = settingsStore.gamePassMarket
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(STOP_TIMEOUT),
+            LibraryRegions.DEFAULT_GAME_PASS_MARKET,
+        )
+
+    val psPlusLocale: StateFlow<String> = settingsStore.psPlusLocale
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(STOP_TIMEOUT),
+            LibraryRegions.DEFAULT_PS_PLUS_LOCALE,
+        )
 
     init {
         viewModelScope.launch {
@@ -133,6 +148,16 @@ class SettingsViewModel(
 
     fun setImageQuality(quality: ImageQuality) {
         viewModelScope.launch { settingsStore.setImageQuality(quality) }
+    }
+
+    // ---------- game library regions ----------
+
+    fun setGamePassMarket(code: String) {
+        viewModelScope.launch { settingsStore.setGamePassMarket(code) }
+    }
+
+    fun setPsPlusLocale(code: String) {
+        viewModelScope.launch { settingsStore.setPsPlusLocale(code) }
     }
 
     // ---------- backup ----------

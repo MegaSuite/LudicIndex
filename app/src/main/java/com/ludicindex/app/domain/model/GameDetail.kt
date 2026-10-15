@@ -1,5 +1,9 @@
 package com.ludicindex.app.domain.model
 
+import com.ludicindex.app.domain.website.WebsiteCategory
+import com.ludicindex.app.domain.website.websiteCategory
+import com.ludicindex.app.domain.website.websiteLabel
+
 data class GameVideo(
     val name: String?,
     val videoId: String,
@@ -56,9 +60,9 @@ data class GameDetail(
     val gameModes: List<String> = emptyList(),
     val playerPerspectives: List<String> = emptyList(),
     val engines: List<String> = emptyList(),
-    val developers: List<String> = emptyList(),
-    val publishers: List<String> = emptyList(),
-    val portingCompanies: List<String> = emptyList(),
+    val developers: List<CompanyRef> = emptyList(),
+    val publishers: List<CompanyRef> = emptyList(),
+    val portingCompanies: List<CompanyRef> = emptyList(),
     val collection: String? = null,
     val franchise: String? = null,
     val similarGames: List<SimilarGame> = emptyList(),
@@ -73,6 +77,15 @@ data class GameDetail(
         releaseDate > nowEpochSeconds -> ReleaseStatus.UPCOMING
         else -> ReleaseStatus.RELEASED
     }
+
+    /**
+     * Labels of this game's store/platform links (Steam, PlayStation Store, Xbox Store, …) in IGDB
+     * order. This is what a wishlist entry can be tagged with as its platform.
+     */
+    fun storeOptions(): List<String> = websites
+        .filter { websiteCategory(it.type, it.url) == WebsiteCategory.STORE }
+        .map { websiteLabel(it.type, it.url) }
+        .distinct()
 
     fun toGame(): Game = Game(
         igdbId = igdbId,

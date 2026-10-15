@@ -27,15 +27,19 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -60,6 +64,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -82,7 +87,11 @@ import com.ludicindex.app.ui.format.formatCount
 import com.ludicindex.app.ui.format.formatRating
 import com.ludicindex.app.ui.format.formatReleaseDate
 import com.ludicindex.app.ui.format.formatReleaseYear
-import com.ludicindex.app.ui.format.websiteTypeLabel
+import com.ludicindex.app.domain.model.CompanyRef
+import com.ludicindex.app.domain.model.CompanyRole
+import com.ludicindex.app.domain.website.WebsiteCategory
+import com.ludicindex.app.domain.website.websiteCategory
+import com.ludicindex.app.domain.website.websiteLabel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -91,6 +100,7 @@ fun GameDetailScreen(
     onBack: () -> Unit,
     onOpenSettings: () -> Unit,
     onGameClick: (Long) -> Unit,
+    onCompanyClick: (CompanyRef, CompanyRole) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val viewModel: GameDetailViewModel = appViewModel { container ->
@@ -105,6 +115,8 @@ fun GameDetailScreen(
         .collectAsStateWithLifecycle(initialValue = ImageQuality.STANDARD)
 
     val snackbarHostState = remember { SnackbarHostState() }
+
+    val storeOptions = state.detail?.storeOptions().orEmpty()
 
     LaunchedEffect(state.message) {
         state.message?.let { text ->
@@ -135,7 +147,8 @@ fun GameDetailScreen(
             if (state.detail != null) {
                 WishlistActionBar(
                     inWishlist = state.inWishlist,
-                    onAdd = viewModel::addToWishlist,
+                    platformOptions = storeOptions,
+                    onAdd = { platform -> viewModel.addToWishlist(platform) },
                     onRemove = viewModel::removeFromWishlist,
                 )
             }
@@ -160,6 +173,7 @@ fun GameDetailScreen(
                 imageQuality = imageQuality,
                 onRefresh = viewModel::refresh,
                 onGameClick = onGameClick,
+                onCompanyClick = onCompanyClick,
                 modifier = Modifier.padding(innerPadding),
             )
         }
@@ -175,6 +189,7 @@ private fun DetailBody(
     imageQuality: ImageQuality,
     onRefresh: () -> Unit,
     onGameClick: (Long) -> Unit,
+    onCompanyClick: (CompanyRef, CompanyRole) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -305,7 +320,7 @@ private fun DetailBody(
                 }
             }
 
-            item { FactSheet(detail) }
+            item { FactSheet(detail, onCompanyClick) }
 
             if (detail.languages.isNotEmpty()) {
                 item {
@@ -318,18 +333,39 @@ private fun DetailBody(
             if (detail.websites.isNotEmpty()) {
                 item {
                     SectionBlock(title = "相关链接") {
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        Column(
                             modifier = Modifier.padding(horizontal = 16.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
-                            detail.websites.forEach { website ->
-                                MetaChip(
-                                    text = websiteTypeLabel(website.type),
-                                    modifier = Modifier.clickable {
-                                        context.openUrl(IgdbImage.websiteUrl(website.url))
-                                    },
-                                )
+                            val grouped = detail.websites
+                                .distinctBy { it.url }
+                                .groupBy { websiteCategory(it.type, it.url) }
+                            WebsiteCategory.entries.forEach { category ->
+                                val links = grouped[category].orEmpty()
+                                if (links.isEmpty()) return@forEach
+                                Column {
+                                    Text(
+                                        text = category.label,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                    FlowRow(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                                        modifier = Modifier.padding(top = 2.dp),
+                                    ) {
+                                        links.forEach { website ->
+                                            MetaChip(
+                                                text = websiteLabel(website.type, website.url),
+                                                modifier = Modifier.clickable {
+                                                    context.openUrl(
+                                                        IgdbImage.websiteUrl(website.url),
+                                                    )
+                                                },
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -542,13 +578,52 @@ private fun ExpandableText(
 
 private const val COLLAPSED_LINES = 4
 
+/** "开发商" / "发行商" with each company name as a tappable link to its games. */
 @Composable
-private fun FactSheet(detail: GameDetail) {
+private fun CompanyRow(
+    label: String,
+    companies: List<CompanyRef>,
+    role: CompanyRole,
+    onCompanyClick: (CompanyRef, CompanyRole) -> Unit,
+) {
+    if (companies.isEmpty()) return
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            companies.forEach { company ->
+                Text(
+                    text = company.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    textDecoration = TextDecoration.Underline,
+                    modifier = Modifier.clickable { onCompanyClick(company, role) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FactSheet(
+    detail: GameDetail,
+    onCompanyClick: (CompanyRef, CompanyRole) -> Unit,
+) {
     Column(modifier = Modifier.padding(horizontal = 16.dp)) {
         SectionTitle("详细信息")
-        InfoRow("开发商", detail.developers)
-        InfoRow("发行商", detail.publishers)
-        InfoRow("移植", detail.portingCompanies)
+        CompanyRow("开发商", detail.developers, CompanyRole.DEVELOPER, onCompanyClick)
+        CompanyRow("发行商", detail.publishers, CompanyRole.PUBLISHER, onCompanyClick)
+        InfoRow("移植", detail.portingCompanies.map { it.name })
         InfoRow("系列", listOfNotNull(detail.collection))
         InfoRow("作品线", listOfNotNull(detail.franchise))
         InfoRow("类型", detail.genres)
@@ -665,9 +740,10 @@ private fun ChipRow(values: List<String>, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun WishlistActionBar(
+internal fun WishlistActionBar(
     inWishlist: Boolean,
-    onAdd: () -> Unit,
+    platformOptions: List<String>,
+    onAdd: (String?) -> Unit,
     onRemove: () -> Unit,
 ) {
     Surface(tonalElevation = 3.dp) {
@@ -692,12 +768,67 @@ private fun WishlistActionBar(
                 )
                 OutlinedButton(onClick = onRemove) { Text("移除") }
             } else {
-                Button(onClick = onAdd, modifier = Modifier.fillMaxWidth()) {
-                    Icon(Icons.Filled.Add, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("加入心愿单")
-                }
+                AddToWishlistButton(platformOptions = platformOptions, onAdd = onAdd)
             }
+        }
+    }
+}
+
+/**
+ * Compact "加入心愿单" button. When the game has store links it opens an anchored dropdown menu
+ * (the same `DropdownMenu` the settings region picker uses) so the platform is chosen without
+ * taking up any extra space in the bar.
+ */
+@Composable
+private fun AddToWishlistButton(
+    platformOptions: List<String>,
+    onAdd: (String?) -> Unit,
+) {
+    var menuExpanded by remember { mutableStateOf(false) }
+
+    Box(modifier = Modifier.fillMaxWidth()) {
+        Button(
+            onClick = {
+                if (platformOptions.isEmpty()) onAdd(null) else menuExpanded = true
+            },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Icon(Icons.Filled.Add, contentDescription = null)
+            Spacer(Modifier.width(8.dp))
+            Text("加入心愿单")
+            if (platformOptions.isNotEmpty()) {
+                Spacer(Modifier.width(2.dp))
+                Icon(Icons.Filled.ArrowDropDown, contentDescription = "选择游戏平台")
+            }
+        }
+
+        DropdownMenu(
+            expanded = menuExpanded,
+            onDismissRequest = { menuExpanded = false },
+        ) {
+            Text(
+                text = "选择游戏平台",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            )
+            platformOptions.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(option) },
+                    onClick = {
+                        menuExpanded = false
+                        onAdd(option)
+                    },
+                )
+            }
+            HorizontalDivider()
+            DropdownMenuItem(
+                text = { Text("不指定") },
+                onClick = {
+                    menuExpanded = false
+                    onAdd(null)
+                },
+            )
         }
     }
 }

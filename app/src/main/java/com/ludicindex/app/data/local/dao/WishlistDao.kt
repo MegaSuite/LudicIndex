@@ -6,10 +6,10 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
+import androidx.room.ColumnInfo
 import com.ludicindex.app.data.local.entity.EntryTagCrossRef
 import com.ludicindex.app.data.local.entity.WishlistEntryEntity
 import com.ludicindex.app.data.local.relation.WishlistEntryWithTags
-import com.ludicindex.app.domain.model.EntryStatus
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -36,17 +36,20 @@ interface WishlistDao {
     @Query("SELECT COUNT(*) FROM wishlist_entries")
     suspend fun count(): Int
 
+    @Query("SELECT igdb_id, name FROM wishlist_entries")
+    suspend fun allKeys(): List<WishlistKey>
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(entry: WishlistEntryEntity): Long
 
     @Update
     suspend fun update(entry: WishlistEntryEntity)
 
-    @Query("UPDATE wishlist_entries SET status = :status, updated_at = :updatedAt WHERE igdb_id = :igdbId")
-    suspend fun updateStatus(igdbId: Long, status: EntryStatus, updatedAt: Long)
-
     @Query("UPDATE wishlist_entries SET note = :note, updated_at = :updatedAt WHERE igdb_id = :igdbId")
     suspend fun updateNote(igdbId: Long, note: String, updatedAt: Long)
+
+    @Query("UPDATE wishlist_entries SET platform = :platform, updated_at = :updatedAt WHERE igdb_id = :igdbId")
+    suspend fun updatePlatform(igdbId: Long, platform: String?, updatedAt: Long)
 
     @Query("DELETE FROM wishlist_entries WHERE id = :entryId")
     suspend fun deleteById(entryId: Long)
@@ -66,3 +69,9 @@ interface WishlistDao {
     @Query("SELECT COUNT(*) FROM entry_tags WHERE entry_id = :entryId")
     suspend fun countTags(entryId: Long): Int
 }
+
+/** Minimal projection used by the library matcher. */
+data class WishlistKey(
+    @ColumnInfo(name = "igdb_id") val igdbId: Long,
+    @ColumnInfo(name = "name") val name: String,
+)

@@ -20,6 +20,22 @@ fun formatReleaseDate(epochSeconds: Long?): String? = epochSeconds?.let {
     }.getOrNull()
 }
 
+/** Epoch milliseconds (how the library stores sync times) as `yyyy-MM-dd HH:mm`. */
+fun formatDateTime(epochMillis: Long?): String? = epochMillis?.let {
+    runCatching {
+        val dt = Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault())
+        String.format(
+            Locale.US,
+            "%04d-%02d-%02d %02d:%02d",
+            dt.year,
+            dt.monthValue,
+            dt.dayOfMonth,
+            dt.hour,
+            dt.minute,
+        )
+    }.getOrNull()
+}
+
 /** 5491 -> "5,491" */
 fun formatCount(value: Int?): String? =
     value?.takeIf { it > 0 }?.let { String.format(Locale.US, "%,d", it) }

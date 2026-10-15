@@ -3,6 +3,7 @@ package com.ludicindex.app.data.repository
 import com.ludicindex.app.UNRELEASED_DETAIL_JSON
 import com.ludicindex.app.WITCHER_DETAIL_JSON
 import com.ludicindex.app.data.remote.dto.GameDto
+import com.ludicindex.app.domain.model.CompanyRef
 import com.ludicindex.app.domain.model.ReleaseStatus
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
@@ -24,9 +25,9 @@ class GameDetailMappingTest {
     fun splitsCompaniesByTheirRole() {
         val detail = detailOf(WITCHER_DETAIL_JSON)
 
-        assertEquals(listOf("CD Projekt RED"), detail.developers)
-        assertEquals(listOf("WB Games"), detail.publishers)
-        assertEquals(listOf("Fishlabs"), detail.portingCompanies)
+        assertEquals(listOf(CompanyRef(1, "CD Projekt RED")), detail.developers)
+        assertEquals(listOf(CompanyRef(50, "WB Games")), detail.publishers)
+        assertEquals(listOf(CompanyRef(99, "Fishlabs")), detail.portingCompanies)
     }
 
     @Test

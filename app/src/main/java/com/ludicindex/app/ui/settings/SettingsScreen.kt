@@ -3,6 +3,7 @@ package com.ludicindex.app.ui.settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -17,6 +18,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -42,6 +45,8 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.SingletonImageLoader
 import com.ludicindex.app.data.prefs.ImageQuality
+import com.ludicindex.app.data.prefs.LibraryRegions
+import com.ludicindex.app.data.prefs.RegionOption
 import com.ludicindex.app.data.prefs.ThemeMode
 import com.ludicindex.app.ui.appViewModel
 import com.ludicindex.app.ui.components.SectionTitle
@@ -67,6 +72,8 @@ fun SettingsScreen(
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val dynamicColor by viewModel.dynamicColor.collectAsStateWithLifecycle()
     val imageQuality by viewModel.imageQuality.collectAsStateWithLifecycle()
+    val gamePassMarket by viewModel.gamePassMarket.collectAsStateWithLifecycle()
+    val psPlusLocale by viewModel.psPlusLocale.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -116,6 +123,8 @@ fun SettingsScreen(
         themeMode = themeMode,
         dynamicColor = dynamicColor,
         imageQuality = imageQuality,
+        gamePassMarket = gamePassMarket,
+        psPlusLocale = psPlusLocale,
         onClientIdChange = viewModel::onClientIdChange,
         onClientSecretChange = viewModel::onClientSecretChange,
         onSave = viewModel::save,
@@ -124,6 +133,8 @@ fun SettingsScreen(
         onThemeModeChange = viewModel::setThemeMode,
         onDynamicColorChange = viewModel::setDynamicColor,
         onImageQualityChange = viewModel::setImageQuality,
+        onGamePassMarketChange = viewModel::setGamePassMarket,
+        onPsPlusLocaleChange = viewModel::setPsPlusLocale,
         onPasteImport = onOpenImport,
         onExport = { exportLauncher.launch(defaultBackupFileName()) },
         onImportBackup = { importLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) },
@@ -166,6 +177,8 @@ private fun SettingsContent(
     themeMode: ThemeMode,
     dynamicColor: Boolean,
     imageQuality: ImageQuality,
+    gamePassMarket: String,
+    psPlusLocale: String,
     onClientIdChange: (String) -> Unit,
     onClientSecretChange: (String) -> Unit,
     onSave: () -> Unit,
@@ -174,6 +187,8 @@ private fun SettingsContent(
     onThemeModeChange: (ThemeMode) -> Unit,
     onDynamicColorChange: (Boolean) -> Unit,
     onImageQualityChange: (ImageQuality) -> Unit,
+    onGamePassMarketChange: (String) -> Unit,
+    onPsPlusLocaleChange: (String) -> Unit,
     onPasteImport: () -> Unit,
     onExport: () -> Unit,
     onImportBackup: () -> Unit,
@@ -298,9 +313,29 @@ private fun SettingsContent(
             }
         }
 
+        SectionTitle("订阅目录地区")
+        Text(
+            text = "Xbox Game Pass 与 PS Plus 的目录按商店地区划分。" +
+                "选好地区后，在首页对应子标签下拉刷新即可生效。",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        RegionDropdown(
+            label = "Xbox Game Pass 地区",
+            selectedCode = gamePassMarket,
+            options = LibraryRegions.GAME_PASS_MARKETS,
+            onSelect = onGamePassMarketChange,
+        )
+        RegionDropdown(
+            label = "PS Plus 地区",
+            selectedCode = psPlusLocale,
+            options = LibraryRegions.PS_PLUS_LOCALES,
+            onSelect = onPsPlusLocaleChange,
+        )
+
         SectionTitle("数据")
         Text(
-            text = "导出会把心愿单（含标签、状态和备注）写成 JSON 文件；" +
+            text = "导出会把心愿单（含标签和备注）写成 JSON 文件；" +
                 "导入备份会按 IGDB ID 合并，不会重复添加。",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -356,6 +391,44 @@ private fun ResultDialog(result: TestResult, onDismiss: () -> Unit) {
             TextButton(onClick = onDismiss) { Text("确认") }
         },
     )
+}
+
+@Composable
+private fun RegionDropdown(
+    label: String,
+    selectedCode: String,
+    options: List<RegionOption>,
+    onSelect: (String) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val selected = options.firstOrNull { it.code == selectedCode }
+
+    Column {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Box {
+            OutlinedButton(
+                onClick = { expanded = true },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(selected?.let { "${it.label}（${it.code}）" } ?: selectedCode)
+            }
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                options.forEach { option ->
+                    DropdownMenuItem(
+                        text = { Text("${option.label}（${option.code}）") },
+                        onClick = {
+                            onSelect(option.code)
+                            expanded = false
+                        },
+                    )
+                }
+            }
+        }
+    }
 }
 
 private val ThemeMode.displayLabel: String
